@@ -1,0 +1,48 @@
+name: Sync Fork with Upstream
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Fork
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Add Upstream
+      run: |
+        git remote add upstream https://github.com/anthropics/claude-code.git
+        git fetch upstream
+    
+    - name: Sync with Upstream
+      run: |
+        git checkout main
+        git merge upstream/main --no-edit
+        git push origin main
+      continue-on-error: true
+    
+    - name: Create Pull Request if Conflicts
+      if: failure()
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        title: 'Sync fork with upstream'
+        body: |
+          This PR syncs the fork with the upstream repository.
+          
+          ⚠️ There were merge conflicts that need manual resolution.
+          
+          Please review and merge this PR to keep your fork up to date.
+        branch: sync-upstream
+        base: main
